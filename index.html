@@ -134,43 +134,12 @@ const ang=(x1,y1,x2,y2)=>Math.atan2(y2-y1,x2-x1);
 const hsl=(h,s,l,a=1)=>a<1?`hsla(${h},${s}%,${l}%,${a})`:`hsl(${h},${s}%,${l}%)`;
 
 // ══════════════════════════════════════════════════
-// AD SYSTEM
+// AD SYSTEM (CRAZYGAMES DEFINITIVO)
 // ══════════════════════════════════════════════════
-let adCallback=null;
-let adActive=false;
-
-// ══════════════════════════════════════════════════
-// AD SYSTEM (CRAZYGAMES REAL)
-// ══════════════════════════════════════════════════
+let adCallback = null;
 let adActive = false;
 
-// Le avisamos a CrazyGames que el juego ya cargó en su sistema
-setTimeout(() => {
-  if (window.CrazyGames && window.CrazyGames.SDK) {
-    window.CrazyGames.SDK.game.loadingFinished();
-    console.log("SDK de CrazyGames inicializado con éxito.");
-  }
-}, 1000);
-
-// ══════════════════════════════════════════════════
-// AD SYSTEM (CRAZYGAMES REAL)
-// ══════════════════════════════════════════════════
-var adActive = false;
-
-// Aviso de carga para CrazyGames
-setTimeout(function() {
-  if (window.CrazyGames && window.CrazyGames.SDK) {
-    window.CrazyGames.SDK.game.loadingFinished();
-    console.log("SDK de CrazyGames inicializado con éxito.");
-  }
-}, 1000);
-
-// ══════════════════════════════════════════════════
-// AD SYSTEM (CRAZYGAMES REAL)
-// ══════════════════════════════════════════════════
-var adActive = false;
-
-// Aviso de carga para CrazyGames
+// Aviso de carga para CrazyGames (Se ejecuta una sola vez)
 setTimeout(function() {
   if (window.CrazyGames && window.CrazyGames.SDK) {
     window.CrazyGames.SDK.game.loadingFinished();
