@@ -139,42 +139,53 @@ const hsl=(h,s,l,a=1)=>a<1?`hsla(${h},${s}%,${l}%,${a})`:`hsl(${h},${s}%,${l}%)`
 let adCallback=null;
 let adActive=false;
 
-function showAd(rewardText, onComplete){
-  // AQUÍ INTEGRAS TU SDK REAL (GameDistribution, AdSense, etc.)
-  // Por ahora: anuncio simulado de 5 segundos
-  adActive=true;
-  adCallback=onComplete;
-  const overlay=document.getElementById('ad-overlay');
-  const bar=document.getElementById('ad-bar');
-  const secsEl=document.getElementById('ad-secs');
-  const skipBtn=document.getElementById('ad-skip');
-  const rewardEl=document.getElementById('ad-reward');
-  rewardEl.textContent=rewardText||'';
-  skipBtn.style.display='none';
-  bar.style.width='0%';
-  overlay.classList.add('show');
-  const DURATION=5000;
-  const start=Date.now();
-  function tick(){
-    if(!adActive)return;
-    const elapsed=Date.now()-start;
-    const pct=Math.min(1,elapsed/DURATION);
-    bar.style.width=(pct*100)+'%';
-    const remaining=Math.max(0,Math.ceil((DURATION-elapsed)/1000));
-    secsEl.textContent=remaining;
-    if(elapsed>=DURATION){
-      skipBtn.style.display='block';
-      secsEl.textContent='0';
-    } else {
-      requestAnimationFrame(tick);
-    }
+// ══════════════════════════════════════════════════
+// AD SYSTEM (CRAZYGAMES REAL)
+// ══════════════════════════════════════════════════
+let adActive = false;
+
+// Le avisamos a CrazyGames que el juego ya cargó en su sistema
+setTimeout(() => {
+  if (window.CrazyGames && window.CrazyGames.SDK) {
+    window.CrazyGames.SDK.game.loadingFinished();
+    console.log("SDK de CrazyGames inicializado con éxito.");
   }
-  requestAnimationFrame(tick);
-  skipBtn.onclick=function(){
-    overlay.classList.remove('show');
-    adActive=false;
-    if(adCallback){adCallback();adCallback=null;}
-  };
+}, 1000);
+
+function showAd(rewardText, onComplete) {
+  adActive = true;
+  
+  // Pausamos el audio de tu juego si está activo para que no se mezcle con el anuncio
+  if (typeof ac !== 'undefined' && ac) ac.suspend();
+
+  // Verificamos si el SDK de CrazyGames está activo en la página
+  if (window.CrazyGames && window.CrazyGames.SDK) {
+    const crazySDK = window.CrazyGames.SDK;
+    
+    // Solicitamos un anuncio recompensado (Rewarded Ad)
+    crazySDK.ad.requestAd("rewarded", {
+      adStarted: () => {
+        console.log("Anuncio real iniciado");
+      },
+      adFinished: () => {
+        console.log("Anuncio terminado con éxito");
+        if (typeof ac !== 'undefined' && ac) ac.resume(); // Reanudamos sonido
+        if (onComplete) onComplete(); // ¡Entregamos la vida/recompensa al jugador!
+        adActive = false;
+      },
+      adError: (error) => {
+        console.log("Error en el anuncio o AdBlock activo:", error);
+        if (typeof ac !== 'undefined' && ac) ac.resume();
+        if (onComplete) onComplete(); // Respaldo: damos recompensa igual para no trabar el juego
+        adActive = false;
+      }
+    });
+  } else {
+    // Respaldo por si pruebas en tu PC sin internet o de forma local
+    console.log("SDK no encontrado en este entorno. Recompensa automática.");
+    if (onComplete) onComplete();
+    adActive = false;
+  }
 }
 
 // ══════════════════════════════════════════════════
