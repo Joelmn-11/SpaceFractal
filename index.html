@@ -86,6 +86,8 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const ang=(x1,y1,x2,y2)=>Math.atan2(y2-y1,x2-x1);
 const hsl=(h,s,l,a=1)=>a<1?`hsla(${h},${s}%,${l}%,${a})`:`hsl(${h},${s}%,${l}%)`;
 
+
+// Inicializar SDK v3 correctamente (requiere await + init())
 // ══════════════════════════════════════════════════
 // AD SYSTEM - CrazyGames SDK v3 CORRECTO
 // ══════════════════════════════════════════════════
@@ -93,7 +95,7 @@ let adActive = false;
 let gameplayStarted = false;
 let sdkReady = false;
 
-// Inicializar SDK v3 correctamente (requiere await + init())
+// Inicializar SDK v3 correctamente (requiere await)
 async function initSDK() {
   try {
     if (window.CrazyGames && window.CrazyGames.SDK) {
@@ -108,7 +110,12 @@ async function initSDK() {
     sdkReady = false;
   }
 }
-initSDK();
+
+// ⚠️ MODIFICACIÓN CLAVE: Envolver el inicio del juego para asegurar la carga
+window.addEventListener('load', async () => {
+    await initSDK(); 
+    boot(); // Arrancamos el juego SOLO DESPUÉS de que initSDK termine
+});
 
 function notifyGameplayStart() {
   if (sdkReady && window.CrazyGames && window.CrazyGames.SDK && !gameplayStarted) {
@@ -786,7 +793,6 @@ function boot(){
   cam.x=ship.x-W/2;cam.y=ship.y-H/2;cam.shake=0;turbo=TURBO_MAX;turboActive=false;turboRech=false;
   buildStars();camUpdate();requestAnimationFrame(loop);
 }
-boot();
 </script>
 </body>
 </html>
