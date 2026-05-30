@@ -134,54 +134,79 @@ const ang=(x1,y1,x2,y2)=>Math.atan2(y2-y1,x2-x1);
 const hsl=(h,s,l,a=1)=>a<1?`hsla(${h},${s}%,${l}%,${a})`:`hsl(${h},${s}%,${l}%)`;
 
 // ══════════════════════════════════════════════════
-// AD SYSTEM (CRAZYGAMES DEFINITIVO)
+// AD SYSTEM (CRAZYGAMES SDK v3 - CORRECTO)
 // ══════════════════════════════════════════════════
-let adCallback = null;
 let adActive = false;
+let gameplayStarted = false;
 
-// Aviso de carga para CrazyGames (Se ejecuta una sola vez)
-setTimeout(function() {
+// Notificar que el juego terminó de cargar
+window.addEventListener('load', function() {
   if (window.CrazyGames && window.CrazyGames.SDK) {
     window.CrazyGames.SDK.game.loadingFinished();
-    console.log("SDK de CrazyGames inicializado con éxito.");
   }
-}, 1000);
+});
+
+function notifyGameplayStart() {
+  if (window.CrazyGames && window.CrazyGames.SDK && !gameplayStarted) {
+    window.CrazyGames.SDK.game.gameplayStart();
+    gameplayStarted = true;
+  }
+}
+
+function notifyGameplayStop() {
+  if (window.CrazyGames && window.CrazyGames.SDK && gameplayStarted) {
+    window.CrazyGames.SDK.game.gameplayStop();
+    gameplayStarted = false;
+  }
+}
 
 function showAd(rewardText, onComplete) {
+  if (adActive) { if (onComplete) onComplete(); return; }
   adActive = true;
-  
+
+  // Pausar audio
   if (typeof ac !== 'undefined' && ac) {
-    try { ac.suspend(); } catch(e) { console.log(e); }
+    try { ac.suspend(); } catch(e) {}
   }
 
   if (window.CrazyGames && window.CrazyGames.SDK) {
     var crazySDK = window.CrazyGames.SDK;
-    
+
+    // OBLIGATORIO: detener gameplay antes del anuncio
+    notifyGameplayStop();
+
     crazySDK.ad.requestAd("rewarded", {
       adStarted: function() {
-        console.log("Anuncio real iniciado");
+        console.log("[CG] Anuncio iniciado");
       },
       adFinished: function() {
-        console.log("Anuncio terminado con éxito");
+        console.log("[CG] Anuncio terminado OK");
         if (typeof ac !== 'undefined' && ac) {
-          try { ac.resume(); } catch(e) { console.log(e); }
+          try { ac.resume(); } catch(e) {}
         }
-        if (onComplete) onComplete();
         adActive = false;
+        // OBLIGATORIO: reanudar gameplay después del anuncio
+        notifyGameplayStart();
+        if (onComplete) onComplete();
       },
-      adError: function(error) {
-        console.log("Error en el anuncio:", error);
+      adError: function(error, errorData) {
+        console.log("[CG] Error anuncio:", error, errorData);
         if (typeof ac !== 'undefined' && ac) {
-          try { ac.resume(); } catch(e) { console.log(e); }
+          try { ac.resume(); } catch(e) {}
         }
-        if (onComplete) onComplete();
         adActive = false;
+        notifyGameplayStart();
+        // En error/unfilled igual damos la recompensa para no bloquear al jugador
+        if (onComplete) onComplete();
       }
     });
   } else {
-    console.log("SDK no encontrado. Recompensa automática.");
-    if (onComplete) onComplete();
+    console.log("[CG] SDK no disponible, recompensa automática");
+    if (typeof ac !== 'undefined' && ac) {
+      try { ac.resume(); } catch(e) {}
+    }
     adActive = false;
+    if (onComplete) onComplete();
   }
 }
 // ══════════════════════════════════════════════════
@@ -612,7 +637,12 @@ function initGame(fromSaved=false){
   spawnWave();gs=S.PLAYING;
   showLevelUI();
 }
-function handleStart(){getAC();initGame(savedLevel>0);showLevelUI();}
+function handleStart(){
+  getAC();
+  initGame(savedLevel>0);
+  showLevelUI();
+  notifyGameplayStart(); // ← AGREGAR ESTA LÍNEA
+}
 
 function spawnWave(){
   const z=ZONES[level];const hpM=1+level*.12,spM=1+level*.09;
