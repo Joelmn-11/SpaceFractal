@@ -1,8 +1,47 @@
-cat > /mnt/user-data/outputs/index.html << 'HTMLEOF'
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+<!-- ══════════════════════════════════════════════════ -->
+<!-- GameDistribution SDK - DEBE ir PRIMERO            -->
+<!-- ══════════════════════════════════════════════════ -->
+<script>
+  window.GD_OPTIONS = {
+    gameId: "73112",   // <-- tu ID de GameDistribution
+    onEvent: function(event) {
+      switch(event.name) {
+        case "SDK_READY":
+          sdkReady = true;
+          console.log("[GD] SDK listo");
+          break;
+        case "SDK_ERROR":
+          sdkReady = false;
+          console.log("[GD] SDK error");
+          break;
+        case "SDK_GAME_START":
+          // GD dice que el juego puede arrancar / reanudar
+          if(adActive) {
+            adActive = false;
+            if(typeof ac !== 'undefined' && ac) { try { ac.resume(); } catch(e) {} }
+            if(_adCallback) { _adCallback(); _adCallback = null; }
+          }
+          console.log("[GD] SDK_GAME_START");
+          break;
+        case "SDK_GAME_PAUSE":
+          // GD dice que pausemos (anuncio a punto de mostrar)
+          if(typeof ac !== 'undefined' && ac) { try { ac.suspend(); } catch(e) {} }
+          console.log("[GD] SDK_GAME_PAUSE");
+          break;
+        case "REWARDED_WATCH_COMPLETE":
+          // El jugador vio el anuncio recompensado completo
+          _rewardGranted = true;
+          console.log("[GD] Recompensa ganada");
+          break;
+      }
+    }
+  };
+</script>
+<script src="https://html5.api.gamedistribution.com/main.min.js"></script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>SpaceFractal</title>
@@ -87,85 +126,86 @@ const ang=(x1,y1,x2,y2)=>Math.atan2(y2-y1,x2-x1);
 const hsl=(h,s,l,a=1)=>a<1?`hsla(${h},${s}%,${l}%,${a})`:`hsl(${h},${s}%,${l}%)`;
 
 // ══════════════════════════════════════════════════
-// AD SYSTEM - CrazyGames SDK v3 CORRECTO
+// AD SYSTEM - GameDistribution SDK
+// GD_OPTIONS ya fue definido en el <head> antes del SDK
 // ══════════════════════════════════════════════════
 let adActive = false;
-let gameplayStarted = false;
-let sdkReady = false;
+let sdkReady = false;          // se pone true en SDK_READY (callback de arriba)
+let _adCallback = null;        // callback a ejecutar tras SDK_GAME_START
+let _rewardGranted = false;    // true cuando REWARDED_WATCH_COMPLETE dispara
 
-// Inicializar SDK v3 correctamente (requiere await)
-async function initSDK() {
-  try {
-    if (window.CrazyGames && window.CrazyGames.SDK) {
-      window.CrazyGames.SDK.game.loadingStart();
-      await window.CrazyGames.SDK.init();
-      sdkReady = true;
-      window.CrazyGames.SDK.game.loadingStop();
-      console.log("[CG] SDK v3 inicializado OK");
-    }
-  } catch(e) {
-    console.log("[CG] SDK init error:", e);
-    sdkReady = false;
-  }
-}
-
-// ⚠️ MODIFICACIÓN CLAVE: Envolver el inicio del juego para asegurar la carga
-window.addEventListener('load', async () => {
-    await initSDK(); 
-    boot(); // Arrancamos el juego SOLO DESPUÉS de que initSDK termine
-});
-
+// Notificar a GD que el juego empezó (gameplay activo)
 function notifyGameplayStart() {
-  if (sdkReady && window.CrazyGames && window.CrazyGames.SDK && !gameplayStarted) {
-    try {
-      window.CrazyGames.SDK.game.gameplayStart();
-      gameplayStarted = true;
-      console.log("[CG] gameplayStart OK");
-    } catch(e) { console.log("[CG] gameplayStart error:", e); }
-  }
+  try {
+    if(window.gdsdk && window.gdsdk.gameplayStart) {
+      window.gdsdk.gameplayStart();
+      console.log("[GD] gameplayStart OK");
+    }
+  } catch(e) { console.log("[GD] gameplayStart error:", e); }
 }
 
+// Notificar a GD que el gameplay se detuvo (menú, pausa, game over)
 function notifyGameplayStop() {
-  if (sdkReady && window.CrazyGames && window.CrazyGames.SDK && gameplayStarted) {
-    try {
-      window.CrazyGames.SDK.game.gameplayStop();
-      gameplayStarted = false;
-      console.log("[CG] gameplayStop OK");
-    } catch(e) { console.log("[CG] gameplayStop error:", e); }
-  }
+  try {
+    if(window.gdsdk && window.gdsdk.gameplayStop) {
+      window.gdsdk.gameplayStop();
+      console.log("[GD] gameplayStop OK");
+    }
+  } catch(e) { console.log("[GD] gameplayStop error:", e); }
 }
 
-function showAd(rewardText, onComplete) {
-  if (adActive) { if (onComplete) onComplete(); return; }
+// Mostrar anuncio recompensado con GD SDK
+// onComplete se llama SIEMPRE (aunque el anuncio falle o no haya fill)
+// onRewarded se llama SOLO si el jugador vio el anuncio completo
+function showAd(label, onRewarded, onComplete) {
+  if(adActive) { if(onComplete) onComplete(false); return; }
   adActive = true;
-  if (typeof ac !== 'undefined' && ac) { try { ac.suspend(); } catch(e) {} }
+  _rewardGranted = false;
+  notifyGameplayStop();
 
-  if (sdkReady && window.CrazyGames && window.CrazyGames.SDK) {
-    notifyGameplayStop();
-    window.CrazyGames.SDK.ad.requestAd("rewarded", {
-      adStarted: function() {
-        console.log("[CG] Anuncio INICIADO");
-      },
-      adFinished: function() {
-        console.log("[CG] Anuncio TERMINADO OK");
-        if (typeof ac !== 'undefined' && ac) { try { ac.resume(); } catch(e) {} }
-        adActive = false;
-        notifyGameplayStart();
-        if (onComplete) onComplete();
-      },
-      adError: function(error, errorData) {
-        console.log("[CG] Error/unfilled:", error, errorData);
-        if (typeof ac !== 'undefined' && ac) { try { ac.resume(); } catch(e) {} }
-        adActive = false;
-        notifyGameplayStart();
-        if (onComplete) onComplete(); // dar recompensa igual
-      }
-    });
+  if(sdkReady && window.gdsdk) {
+    // GD usa SDK_GAME_PAUSE antes del ad y SDK_GAME_START después
+    // y REWARDED_WATCH_COMPLETE si el jugador ganó recompensa
+    _adCallback = function() {
+      adActive = false;
+      notifyGameplayStart();
+      const rewarded = _rewardGranted;
+      _rewardGranted = false;
+      if(rewarded && onRewarded) onRewarded();
+      if(onComplete) onComplete(rewarded);
+    };
+
+    try {
+      // showAd con tipo 'rewarded'
+      window.gdsdk.showAd(window.gdsdk.AdType ? window.gdsdk.AdType.Rewarded : 'rewarded')
+        .catch(function(err) {
+          console.log("[GD] showAd error/unfilled:", err);
+          // Si falla, damos la recompensa igual (buena práctica UX)
+          adActive = false;
+          _adCallback = null;
+          if(typeof ac !== 'undefined' && ac) { try { ac.resume(); } catch(e2) {} }
+          notifyGameplayStart();
+          _rewardGranted = false;
+          if(onRewarded) onRewarded();
+          if(onComplete) onComplete(true);
+        });
+    } catch(err) {
+      console.log("[GD] showAd excepción:", err);
+      adActive = false;
+      _adCallback = null;
+      if(typeof ac !== 'undefined' && ac) { try { ac.resume(); } catch(e2) {} }
+      notifyGameplayStart();
+      if(onRewarded) onRewarded();
+      if(onComplete) onComplete(true);
+    }
   } else {
-    console.log("[CG] SDK no listo, recompensa auto");
-    if (typeof ac !== 'undefined' && ac) { try { ac.resume(); } catch(e) {} }
+    // SDK no listo → dar recompensa directamente (dev/local mode)
+    console.log("[GD] SDK no listo — recompensa automática (" + label + ")");
     adActive = false;
-    if (onComplete) onComplete();
+    if(typeof ac !== 'undefined' && ac) { try { ac.resume(); } catch(e2) {} }
+    notifyGameplayStart();
+    if(onRewarded) onRewarded();
+    if(onComplete) onComplete(true);
   }
 }
 
@@ -194,8 +234,26 @@ function onLevelBtnClick(targetLevel){
   if(targetLevel===level)return;
   if(unlockedLevels.has(targetLevel)){jumpToLevel(targetLevel);return;}
   const cost=getLevelCost(targetLevel);
-  if(cost===1){showAd(`🔓 Nivel ${targetLevel+1}`,()=>{unlockedLevels.add(targetLevel);saveUnlocked();jumpToLevel(targetLevel);buildLevelRow();});}
-  else{showAd(`📺 1/2 — Nivel ${targetLevel+1}`,()=>{showAd(`📺 2/2 — Nivel ${targetLevel+1}`,()=>{unlockedLevels.add(targetLevel);saveUnlocked();jumpToLevel(targetLevel);buildLevelRow();});});}
+  if(cost===1){
+    showAd(
+      `Nivel ${targetLevel+1}`,
+      ()=>{unlockedLevels.add(targetLevel);saveUnlocked();jumpToLevel(targetLevel);buildLevelRow();},
+      null
+    );
+  } else {
+    // 2 anuncios para niveles avanzados
+    showAd(
+      `1/2 Nivel ${targetLevel+1}`,
+      ()=>{
+        showAd(
+          `2/2 Nivel ${targetLevel+1}`,
+          ()=>{unlockedLevels.add(targetLevel);saveUnlocked();jumpToLevel(targetLevel);buildLevelRow();},
+          null
+        );
+      },
+      null
+    );
+  }
 }
 function jumpToLevel(targetLevel){
   level=targetLevel;savedLevel=targetLevel;
@@ -227,9 +285,15 @@ function offerRevive(){
     if(elapsed>=EXPIRE){closeRevive(false);}else{reviveTimer=requestAnimationFrame(tick);}
   }
   reviveTimer=requestAnimationFrame(tick);
+
   document.getElementById('btn-revive').onclick=()=>{
-    cancelAnimationFrame(reviveTimer);overlay.classList.remove('show');
-    showAd('💚 Reviviendo...',()=>{doRevive();});
+    cancelAnimationFrame(reviveTimer);
+    overlay.classList.remove('show');
+    showAd(
+      'Revivir',
+      ()=>doRevive(),   // onRewarded — solo si vio el anuncio
+      (rewarded)=>{ if(!rewarded) closeRevive(false); }  // onComplete — si no vio, game over
+    );
   };
   document.getElementById('btn-no-revive').onclick=()=>{cancelAnimationFrame(reviveTimer);closeRevive(false);};
 }
@@ -413,8 +477,10 @@ function initGame(fromSaved=false){
   spawnWave();gs=S.PLAYING;showLevelUI();
 }
 function handleStart(){
-  getAC();initGame(savedLevel>0);showLevelUI();
-  notifyGameplayStart(); // OBLIGATORIO SDK v3
+  getAC();
+  initGame(savedLevel>0);
+  showLevelUI();
+  notifyGameplayStart(); // OBLIGATORIO GameDistribution
 }
 
 function spawnWave(){const z=ZONES[level];const hpM=1+level*.12,spM=1+level*.09;const count=z[4]+wave*2;for(let i=0;i<count;i++)spawnEnemy(z[5][rndI(0,z[5].length-1)],hpM,spM);}
@@ -791,8 +857,15 @@ function boot(){
   cam.x=ship.x-W/2;cam.y=ship.y-H/2;cam.shake=0;turbo=TURBO_MAX;turboActive=false;turboRech=false;
   buildStars();camUpdate();requestAnimationFrame(loop);
 }
+
+// ══════════════════════════════════════════════════
+// ARRANQUE — GD puede tardar en cargar, boot() inicia
+// el juego de inmediato; sdkReady se pondrá true cuando
+// el callback SDK_READY dispare (puede ser antes o después)
+// ══════════════════════════════════════════════════
+window.addEventListener('load', function() {
+  boot();
+});
 </script>
 </body>
 </html>
-HTMLEOF
-echo "Generado: $(wc -c < /mnt/user-data/outputs/index.html) bytes"
