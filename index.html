@@ -152,42 +152,69 @@ setTimeout(() => {
   }
 }, 1000);
 
+// ══════════════════════════════════════════════════
+// AD SYSTEM (CRAZYGAMES REAL)
+// ══════════════════════════════════════════════════
+var adActive = false;
+
+// Aviso de carga para CrazyGames
+setTimeout(function() {
+  if (window.CrazyGames && window.CrazyGames.SDK) {
+    window.CrazyGames.SDK.game.loadingFinished();
+    console.log("SDK de CrazyGames inicializado con éxito.");
+  }
+}, 1000);
+
+// ══════════════════════════════════════════════════
+// AD SYSTEM (CRAZYGAMES REAL)
+// ══════════════════════════════════════════════════
+var adActive = false;
+
+// Aviso de carga para CrazyGames
+setTimeout(function() {
+  if (window.CrazyGames && window.CrazyGames.SDK) {
+    window.CrazyGames.SDK.game.loadingFinished();
+    console.log("SDK de CrazyGames inicializado con éxito.");
+  }
+}, 1000);
+
 function showAd(rewardText, onComplete) {
   adActive = true;
   
-  // Pausamos el audio de tu juego si está activo para que no se mezcle con el anuncio
-  if (typeof ac !== 'undefined' && ac) ac.suspend();
+  if (typeof ac !== 'undefined' && ac) {
+    try { ac.suspend(); } catch(e) { console.log(e); }
+  }
 
-  // Verificamos si el SDK de CrazyGames está activo en la página
   if (window.CrazyGames && window.CrazyGames.SDK) {
-    const crazySDK = window.CrazyGames.SDK;
+    var crazySDK = window.CrazyGames.SDK;
     
-    // Solicitamos un anuncio recompensado (Rewarded Ad)
     crazySDK.ad.requestAd("rewarded", {
-      adStarted: () => {
+      adStarted: function() {
         console.log("Anuncio real iniciado");
       },
-      adFinished: () => {
+      adFinished: function() {
         console.log("Anuncio terminado con éxito");
-        if (typeof ac !== 'undefined' && ac) ac.resume(); // Reanudamos sonido
-        if (onComplete) onComplete(); // ¡Entregamos la vida/recompensa al jugador!
+        if (typeof ac !== 'undefined' && ac) {
+          try { ac.resume(); } catch(e) { console.log(e); }
+        }
+        if (onComplete) onComplete();
         adActive = false;
       },
-      adError: (error) => {
-        console.log("Error en el anuncio o AdBlock activo:", error);
-        if (typeof ac !== 'undefined' && ac) ac.resume();
-        if (onComplete) onComplete(); // Respaldo: damos recompensa igual para no trabar el juego
+      adError: function(error) {
+        console.log("Error en el anuncio:", error);
+        if (typeof ac !== 'undefined' && ac) {
+          try { ac.resume(); } catch(e) { console.log(e); }
+        }
+        if (onComplete) onComplete();
         adActive = false;
       }
     });
   } else {
-    // Respaldo por si pruebas en tu PC sin internet o de forma local
-    console.log("SDK no encontrado en este entorno. Recompensa automática.");
+    console.log("SDK no encontrado. Recompensa automática.");
     if (onComplete) onComplete();
     adActive = false;
   }
 }
-
 // ══════════════════════════════════════════════════
 // LEVEL UNLOCK SYSTEM
 // ══════════════════════════════════════════════════
